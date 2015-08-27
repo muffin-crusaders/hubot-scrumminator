@@ -12,12 +12,13 @@
     "bugs": {
         "url": "https://github.com/hubot-scripts/hubot-scrumminator/issues"
     },
-    "dependencies": {},
+    "dependencies": {
+        "cron": "^1.0.9"
+    },
     "peerDependencies": {
         "hubot": "2.x"
     },
     "devDependencies": {
-        "cron": "^1.0.9",
         "chai": "^2.1.1",
         "coffee-script": "1.6.3",
         "grunt": "^0.4.5",
