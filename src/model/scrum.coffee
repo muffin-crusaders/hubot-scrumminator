@@ -1,26 +1,54 @@
-# Setup cron
-CronJob = require("cron").CronJob
+CronJob = require('cron').CronJob
+https = require('https')
 
 class Scrum
-    _robot = {}
-    _room = {}
+    token = process.env.HUBOT_GITTER2_TOKEN
+    id_count = 1
 
-    constructor: (robot, time, room) ->
-        _robot = robot
-        _room = room
+    constructor: (robot, time, room, id) ->
+        that = this
+        that._robot = robot
+        that._room = room
+        that._roomId = null
+        that._time = time
+        that._id = id
+        that._chatlog = []
+        that._answers = []
+        that._recentMessage = false
 
-        cronJob = new CronJob(time, startScrum, null, true) #, TIMEZONE)
+        that.cronJob = new CronJob(time, startScrum, null, true, null, this)
+
+        options =
+            hostname: 'api.gitter.im',
+            port:     443,
+            path:     '/v1/rooms/',
+            method:   'GET',
+            headers:  {'Authorization': 'Bearer ' + token}
+
+        req = https.request(options, (res) ->
+            output = ''
+            res.on('data', (chunk) ->
+                output += chunk.toString()
+                )
+            res.on('end', ->
+                for entry in JSON.parse(output)
+                    console.log entry
+                    if entry.url == '/' + that._room
+                        console.log '------- MATCHED ------------\n' + entry.id.toString()
+                        that._roomId = entry.id
+                )
+            )
+
+        req.on('error', (e) ->
+            that._robot.send e )
+
+        req.end()
 
     startScrum = ->
-        console.log "Scrum time! Please provide answers to the following:\n
-            1. What have you done since yesterday?\n
-            2. What are you planning to do today?\n
-            3. Do you have any blocks\n
-            4. Any tasks to add to the Sprint Backlog? (If applicable)\n
-            5. Have you learned or decided anything new? (If applicable)"
-
-        _robot.send
-            room: _room
+        console.log '----------------------------------- startScrum ----------------------------------------------'
+        that = this
+        that._robot.send
+            room: that._room
             """Scrum time! Please provide answers to the following:
             1. What have you done since yesterday?
             2. What are you planning to do today?
@@ -28,6 +56,91 @@ class Scrum
             4. Any tasks to add to the Sprint Backlog? (If applicable)
             5. Have you learned or decided anything new? (If applicable)"""
 
+        options =
+            hostname: 'stream.gitter.im',
+            port:     443,
+            path:     '/v1/rooms/' + that._roomId + '/chatMessages',
+            method:   'GET',
+            headers:  {'Authorization': 'Bearer ' + token}
+
+
+        req = https.request(options, (res) ->
+            output = ''
+            res.on('data', (chunk) ->
+                    # ugly fix for split up chunks
+                    if chunk.toString() != ' \n'
+                        output += chunk.toString()
+                        try
+                            JSON.parse output
+                        catch
+                            console.log '... waiting on rest of response ...'
+                            return
+                        parseLog output
+                )
+            )
+
+        reqSocket = null
+        req.on('socket', (socket) ->
+            reqSocket = socket)
+
+        req.on('error', (e) ->
+            that._robot.send e )
+
+        req.end()
+
+        parseLog = (response) ->
+            console.log('----------------------------------------- parseLog -----------------------------------------------------')
+            console.log 'response ' + response
+            if (response == ' \n')
+                return
+            data = JSON.parse(response.toString())
+            messages = data.text.split('\n')
+            userid = data.fromUser.username
+            displayname = data.fromUser.displayName
+
+            answerPattern = /^[0-9]\.(.+)$/i
+
+            for message in messages
+                if userid != 'ramp-pcar-bot'
+                    that._recentMessage = true
+                    that._chatlog.push message
+                    console.log that._chatlog
+                    that._robot.send
+                        room: that._room
+                        'Received ' + displayname + ': ' + message
+                    if message.match answerPattern
+                        if !that._answers[userid]
+                            that._answers[userid] = []
+                        that._answers[userid].push message
+                        that._robot.send
+                            room: that._room
+                            'Answer pattern matched'
+
+            activityCheck = () ->
+                console.log('---------------------------------- activityCheck -------------------------------------------------')
+                if !that._recentMessage
+                    that.checkCronJob.stop()
+                    if reqSocket then reqSocket.end()
+                    now = new Date()
+                    day = now.getDate()
+                    month = now.getMonth() + 1
+                    year = now.getFullYear()
+                    console.log '-END OF SCRUM FOR ' + month + '/' + day + '/' + year + '-'
+                    that._robot.send
+                        room: that._room
+                        '-END OF SCRUM FOR ' + month + '/' + day + '/' + year + '-'
+                that._recentMessage = false
+
+            that.checkCronJob = `new CronJob('0 * * * * *', activityCheck, null, true, null);`
+
+    cancelCronJob: ->
+        this.cronJob.stop()
+
+    toPrintable: ->
+        this._id.toString() + ": " + this._room.toString() + " at " + this._time.toString()
+
+    getId: ->
+        this._id
 
 #   team: ->
 #     new Team(@robot)
