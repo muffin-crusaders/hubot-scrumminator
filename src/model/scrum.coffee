@@ -1,5 +1,6 @@
 CronJob = require('cron').CronJob
 https = require('https')
+Client = require('ftp')
 
 class Scrum
     token = process.env.HUBOT_GITTER2_TOKEN
@@ -12,8 +13,7 @@ class Scrum
         that._roomId = null
         that._time = time
         that._id = id
-        that._chatlog = []
-        that._answers = []
+        that._scrumLog = []
         that._recentMessage = false
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
@@ -32,9 +32,7 @@ class Scrum
                 )
             res.on('end', ->
                 for entry in JSON.parse(output)
-                    console.log entry
                     if entry.url == '/' + that._room
-                        console.log '------- MATCHED ------------\n' + entry.id.toString()
                         that._roomId = entry.id
                 )
             )
@@ -45,7 +43,6 @@ class Scrum
         req.end()
 
     startScrum = ->
-        console.log '----------------------------------- startScrum ----------------------------------------------'
         that = this
         that._robot.send
             room: that._room
@@ -55,6 +52,16 @@ class Scrum
             3. Do you have any blocks
             4. Any tasks to add to the Sprint Backlog? (If applicable)
             5. Have you learned or decided anything new? (If applicable)"""
+
+        that._scrumLog['Room'] = that._room
+        now = new Date()
+        day = now.getDate()
+        month = now.getMonth() + 1
+        year = now.getFullYear()
+        hour = now.getHours()
+        minutes = now.getMinutes()
+        that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString + ' at ' +
+            hour.toString() + ':' + minutes.toString()
 
         options =
             hostname: 'stream.gitter.im',
@@ -76,6 +83,7 @@ class Scrum
                             console.log '... waiting on rest of response ...'
                             return
                         parseLog output
+                        output = ''
                 )
             )
 
@@ -88,9 +96,34 @@ class Scrum
 
         req.end()
 
+        options2 =
+            hostname: 'api.gitter.im',
+            port:     443,
+            path:     '/v1/rooms/' + that._roomId + '/users',
+            method:   'GET',
+            headers:  {'Authorization': 'Bearer ' + token}
+
+        req2 = https.request(options2, (res) ->
+            output = ''
+            res.on('data', (chunk) ->
+                output += chunk.toString()
+                )
+            res.on('end', ->
+                for user in JSON.parse(output)
+                    if user.username != 'ramp-pcar-bot'
+                        that._scrumLog[user.username] = {
+                            'username': user.username,
+                            'displayName': user.displayName,
+                            'answers': ['', '', '', '', '']
+                        }
+                )
+            )
+        req2.on('error', (e) ->
+            that._robot.send e )
+
+        req2.end()
+
         parseLog = (response) ->
-            console.log('----------------------------------------- parseLog -----------------------------------------------------')
-            console.log 'response ' + response
             if (response == ' \n')
                 return
             data = JSON.parse(response.toString())
@@ -98,40 +131,37 @@ class Scrum
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
-            answerPattern = /^[0-9]\.(.+)$/i
+            answerPattern = /^([0-9])\.(.+)$/i
 
             for message in messages
-                if userid != 'ramp-pcar-bot'
+                if userid != 'ramp-pcar-bot' && message.match answerPattern
                     that._recentMessage = true
-                    that._chatlog.push message
-                    console.log that._chatlog
+                    num = answerPattern.exec(message)[1]
+                    that._scrumLog[userid].answers[num-1] = message
                     that._robot.send
                         room: that._room
-                        'Received ' + displayname + ': ' + message
-                    if message.match answerPattern
-                        if !that._answers[userid]
-                            that._answers[userid] = []
-                        that._answers[userid].push message
-                        that._robot.send
-                            room: that._room
-                            'Answer pattern matched'
+                        'Answer pattern matched'
 
-            activityCheck = () ->
-                console.log('---------------------------------- activityCheck -------------------------------------------------')
-                if !that._recentMessage
-                    that.checkCronJob.stop()
-                    if reqSocket then reqSocket.end()
-                    now = new Date()
-                    day = now.getDate()
-                    month = now.getMonth() + 1
-                    year = now.getFullYear()
-                    console.log '-END OF SCRUM FOR ' + month + '/' + day + '/' + year + '-'
-                    that._robot.send
-                        room: that._room
-                        '-END OF SCRUM FOR ' + month + '/' + day + '/' + year + '-'
-                that._recentMessage = false
+        activityCheck = () ->
+            if !that._recentMessage
+                that.checkCronJob.stop()
+                if reqSocket then reqSocket.end()
+                ftpOptions = {
+                    host: '69.89.25.92'
+                    user: 'FGP'
+                    password: 'FGPvizR2'
+                }
+                c = new Client()
+                b = new Buffer(JSON.stringify(that._scrumLog))
+                c.on 'ready', ->
+                    c.put b, 'scrum.txt', (err) ->
+                        if err
+                            throw err
+                        c.end
+                c.connect ftpOptions
+            that._recentMessage = false
 
-            that.checkCronJob = `new CronJob('0 * * * * *', activityCheck, null, true, null);`
+        that.checkCronJob = new CronJob('*/30 * * * * *', activityCheck, null, true, null)
 
     cancelCronJob: ->
         this.cronJob.stop()
@@ -141,6 +171,9 @@ class Scrum
 
     getId: ->
         this._id
+
+    getLog: ->
+        this._scrumLog
 
 #   team: ->
 #     new Team(@robot)

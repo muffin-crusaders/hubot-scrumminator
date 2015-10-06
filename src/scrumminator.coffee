@@ -16,16 +16,14 @@
 # Models
 Scrum = require('./model/scrum')
 
-module.exports = (robot) ->
-    scrum_list = []
-    id_count = 1
+scrum_list = []
+id_count = 1
 
+module.exports = (robot) ->
     robot.respond /schedule scrum at `?(.+)`? in (\S+)/i, (res) ->
         cron = res.match[1]
         room = res.match[2]
-        scrum = new Scrum robot, cron, room, id_count
-        id_count += 1
-        scrum_list.push scrum
+        scrum = createScrum robot, cron, room
 
         res.reply 'Scheduled scrum ' + scrum.toPrintable()
 
@@ -50,9 +48,7 @@ module.exports = (robot) ->
                 res.reply "Sorry, I couldn't understand the time"
                 return
 
-        scrum = new Scrum robot, cron, room, id_count
-        id_count += 1
-        scrum_list.push scrum
+        scrum = createScrum robot, cron, room
 
         res.reply 'Scheduled scrum ' + scrum.toPrintable()
 
@@ -68,14 +64,39 @@ module.exports = (robot) ->
                 scrum.cancelCronJob()
                 # removes the chosen scrum from the list
                 scrum_list.splice(scrum_list.indexOf(scrum), 1)
+                robot.brain.remove 'scrum' + id
+                robot.brain.save
                 res.send "Scrum " + id + " has been canceled"
                 return
-                
-### BROKEN - need to access chatlog and answers from Scrum now
-    robot.respond /chatlog (.+)/i, (res) ->
-        robot.send room: 'AleksueiR/CyberTests', chatlog.toString()
 
-    robot.respond /answers (.+)/i, (res) ->
+    robot.respond /answers for (.+) from (.+)/i, (res) ->
         userid = res.match[1]
-        robot.send room: 'AleksueiR/CyberTests', if answers[userid] then answers[userid].toString() else "No answers given"
-###
+        scrumid = parseInt(res.match[2], 10)
+        log = []
+        for scrum in scrum_list
+            if scrum.getId() == scrumid
+                log = scrum.getLog()
+                message = ''
+                message += '>' + answer + '\n' for answer in log[userid].answers
+                robot.send
+                    room: 'AleksueiR/CyberTests'
+                    message
+                break
+
+    #LOAD PAST SCRUMS
+    robot.brain.on 'init', ->
+        stored_scrums = robot.brain.data._private
+
+        for s in Object.keys(stored_scrums)
+            scrum = stored_scrums[s]
+            robot.brain.remove s
+            createScrum robot, scrum.time, scrum.room
+
+createScrum = (robot, time, room) ->
+    scrum = new Scrum robot, time, room, id_count
+    robot.brain.set 'scrum' + id_count.toString(), {'time': time, 'room': room}
+    id_count += 1
+    scrum_list.push scrum
+    robot.brain.save
+
+    return scrum
