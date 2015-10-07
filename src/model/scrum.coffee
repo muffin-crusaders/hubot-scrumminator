@@ -14,7 +14,7 @@ class Scrum
         that._time = time
         that._id = id
         that._scrumLog = {}
-        that._recentMessage = false
+        that._recentMessage = true
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
 
@@ -145,9 +145,10 @@ class Scrum
                 if reqSocket then reqSocket.end()
                 console.log that._scrumLog
                 that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
+                that._recentMessage = true
             that._recentMessage = false
 
-        that.checkCronJob = new CronJob('*/30 * * * * *', activityCheck, null, true, null)
+        that.checkCronJob = new CronJob('0 */15 * * * *', activityCheck, null, true, null)
 
     cancelCronJob: ->
         this.cronJob.stop()
