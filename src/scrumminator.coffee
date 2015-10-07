@@ -78,9 +78,7 @@ module.exports = (robot) ->
                 log = scrum.getLog()
                 message = ''
                 message += '>' + answer + '\n' for answer in log[userid].answers
-                robot.send
-                    room: 'AleksueiR/CyberTests'
-                    message
+                res.send message
                 break
 
     #LOAD PAST SCRUMS
