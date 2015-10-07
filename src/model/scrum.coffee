@@ -131,10 +131,10 @@ class Scrum
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
-            answerPattern = /^([0-9])\.(.+)$/i
+            answerPattern = /^([0-9])[\.\-](.+)$/i
 
             for message in messages
-                if userid != 'ramp-pcar-bot' && message.match answerPattern
+                if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
