@@ -138,6 +138,10 @@ class Scrum
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
+                    if that._scrumLog[userid].answers.indexOf('') < 0
+                        that._robot.send
+                            room: that._room,
+                            'Thanks ' + displayname.split(' ')[0]
 
         activityCheck = () ->
             if !that._recentMessage
