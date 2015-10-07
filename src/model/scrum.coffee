@@ -24,8 +24,6 @@ class Scrum
             .then (user) ->
                 user.rooms()
                     .then (rooms) ->
-                        console.log 'RECIEVED ROOMS'
-                        console.log rooms
                         for room in rooms
                             if room.uri == that._room
                                 that._roomId = room.id
@@ -54,20 +52,14 @@ class Scrum
 
         gitter.rooms.find(that._roomId)
             .then (room) ->
-                console.log 'FOUND ROOM'
-                console.log room
                 room.subscribe()
 
                 room.on 'chatMessages', (message) ->
-                    console.log 'RECIEVED MESSAGE:'
-                    console.log message
                     if message.operation == 'create'
                         parseLog message
 
                 room.users()
                     .then (users) ->
-                        console.log 'USERS RECIEVED'
-                        console.log users
                         for user in users
                             if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
                                 that._scrumLog[user.username] = {
@@ -79,9 +71,7 @@ class Scrum
 
         parseLog = (response) ->
             console.log '----------------------- parseLog --------------------------------'
-            # if (response == ' \n')
-            #     return
-            # data = JSON.parse(response.toString())
+            console.log response
             data = response.model
             messages = data.text.split('\n')
             userid = data.fromUser.username
@@ -99,12 +89,14 @@ class Scrum
         activityCheck = () ->
             console.log '--------------------- activityCheck ---------------------------'
             if !that._recentMessage
+                console.log 'Ending scrum'
                 that.checkCronJob.stop()
                 gitter.rooms.find(that._roomId)
                     .then (room) ->
                         room.unsubscribe()
                 that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
             that._recentMessage = false
+            console.log 'Continuing scrum'
 
         that.checkCronJob = new CronJob('*/30 * * * * *', activityCheck, null, true, null)
 
