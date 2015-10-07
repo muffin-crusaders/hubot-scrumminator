@@ -149,6 +149,7 @@ class Scrum
                 if reqSocket then reqSocket.end()
                 console.log that._scrumLog
                 that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
+                that._robot.brain.save
                 that._recentMessage = true
             that._recentMessage = false
 
