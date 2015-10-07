@@ -13,7 +13,7 @@ class Scrum
         that._roomId = null
         that._time = time
         that._id = id
-        that._scrumLog = []
+        that._scrumLog = {}
         that._recentMessage = false
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
@@ -60,7 +60,7 @@ class Scrum
         year = now.getFullYear()
         hour = now.getHours()
         minutes = now.getMinutes()
-        that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString + ' at ' +
+        that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
             hour.toString() + ':' + minutes.toString()
 
         options =
@@ -110,7 +110,7 @@ class Scrum
                 )
             res.on('end', ->
                 for user in JSON.parse(output)
-                    if user.username != 'ramp-pcar-bot'
+                    if user.username != process.env.HUBOT_NAME
                         that._scrumLog[user.username] = {
                             'username': user.username,
                             'displayName': user.displayName,
@@ -138,14 +138,13 @@ class Scrum
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
-                    that._robot.send
-                        room: that._room
-                        'Answer pattern matched'
 
         activityCheck = () ->
             if !that._recentMessage
                 that.checkCronJob.stop()
                 if reqSocket then reqSocket.end()
+                console.log that._scrumLog
+                that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
             that._recentMessage = false
 
         that.checkCronJob = new CronJob('*/30 * * * * *', activityCheck, null, true, null)
