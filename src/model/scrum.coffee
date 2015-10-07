@@ -1,10 +1,12 @@
 CronJob = require('cron').CronJob
 https = require('https')
-Client = require('ftp')
+Gitter = require('node-gitter')
 
 class Scrum
     token = process.env.HUBOT_GITTER2_TOKEN
+    gitter = new Gitter(token)
     id_count = 1
+
 
     constructor: (robot, time, room, id) ->
         that = this
@@ -18,29 +20,16 @@ class Scrum
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
 
-        options =
-            hostname: 'api.gitter.im',
-            port:     443,
-            path:     '/v1/rooms/',
-            method:   'GET',
-            headers:  {'Authorization': 'Bearer ' + token}
+        gitter.currentUser()
+            .then (user) ->
+                user.rooms()
+                    .then (rooms) ->
+                        console.log 'RECIEVED ROOMS'
+                        console.log rooms
+                        for room in rooms
+                            if room.uri == that._room
+                                that._roomId = room.id
 
-        req = https.request(options, (res) ->
-            output = ''
-            res.on('data', (chunk) ->
-                output += chunk.toString()
-                )
-            res.on('end', ->
-                for entry in JSON.parse(output)
-                    if entry.url == '/' + that._room
-                        that._roomId = entry.id
-                )
-            )
-
-        req.on('error', (e) ->
-            that._robot.send e )
-
-        req.end()
 
     startScrum = ->
         that = this
@@ -63,70 +52,37 @@ class Scrum
         that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
             hour.toString() + ':' + minutes.toString()
 
-        options =
-            hostname: 'stream.gitter.im',
-            port:     443,
-            path:     '/v1/rooms/' + that._roomId + '/chatMessages',
-            method:   'GET',
-            headers:  {'Authorization': 'Bearer ' + token}
+        gitter.rooms.find(that._roomId)
+            .then (room) ->
+                console.log 'FOUND ROOM'
+                console.log room
+                room.subscribe()
 
+                room.on 'chatMessages', (message) ->
+                    console.log 'RECIEVED MESSAGE:'
+                    console.log message
+                    if message.operation == 'create'
+                        parseLog message
 
-        req = https.request(options, (res) ->
-            output = ''
-            res.on('data', (chunk) ->
-                    # ugly fix for split up chunks
-                    if chunk.toString() != ' \n'
-                        output += chunk.toString()
-                        try
-                            JSON.parse output
-                        catch
-                            console.log '... waiting on rest of response ...'
-                            return
-                        parseLog output
-                        output = ''
-                )
-            )
+                room.users()
+                    .then (users) ->
+                        console.log 'USERS RECIEVED'
+                        console.log users
+                        for user in users
+                            if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
+                                that._scrumLog[user.username] = {
+                                    'username': user.username,
+                                    'displayName': user.displayName,
+                                    'answers': ['', '', '', '', '']
+                                }
 
-        reqSocket = null
-        req.on('socket', (socket) ->
-            reqSocket = socket)
-
-        req.on('error', (e) ->
-            that._robot.send e )
-
-        req.end()
-
-        options2 =
-            hostname: 'api.gitter.im',
-            port:     443,
-            path:     '/v1/rooms/' + that._roomId + '/users',
-            method:   'GET',
-            headers:  {'Authorization': 'Bearer ' + token}
-
-        req2 = https.request(options2, (res) ->
-            output = ''
-            res.on('data', (chunk) ->
-                output += chunk.toString()
-                )
-            res.on('end', ->
-                for user in JSON.parse(output)
-                    if user.username != process.env.HUBOT_NAME
-                        that._scrumLog[user.username] = {
-                            'username': user.username,
-                            'displayName': user.displayName,
-                            'answers': ['', '', '', '', '']
-                        }
-                )
-            )
-        req2.on('error', (e) ->
-            that._robot.send e )
-
-        req2.end()
 
         parseLog = (response) ->
-            if (response == ' \n')
-                return
-            data = JSON.parse(response.toString())
+            console.log '----------------------- parseLog --------------------------------'
+            # if (response == ' \n')
+            #     return
+            # data = JSON.parse(response.toString())
+            data = response.model
             messages = data.text.split('\n')
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
@@ -139,24 +95,31 @@ class Scrum
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
 
+
         activityCheck = () ->
+            console.log '--------------------- activityCheck ---------------------------'
             if !that._recentMessage
                 that.checkCronJob.stop()
-                if reqSocket then reqSocket.end()
-                console.log that._scrumLog
+                gitter.rooms.find(that._roomId)
+                    .then (room) ->
+                        room.unsubscribe()
                 that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
             that._recentMessage = false
 
         that.checkCronJob = new CronJob('*/30 * * * * *', activityCheck, null, true, null)
 
+
     cancelCronJob: ->
         this.cronJob.stop()
+
 
     toPrintable: ->
         this._id.toString() + ": " + this._room.toString() + " at `" + this._time.toString() + "`"
 
+
     getId: ->
         this._id
+
 
     getLog: ->
         this._scrumLog
