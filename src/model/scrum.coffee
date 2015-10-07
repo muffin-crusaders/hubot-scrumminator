@@ -146,19 +146,6 @@ class Scrum
             if !that._recentMessage
                 that.checkCronJob.stop()
                 if reqSocket then reqSocket.end()
-                ftpOptions = {
-                    host: '69.89.25.92'
-                    user: 'FGP'
-                    password: 'FGPvizR2'
-                }
-                c = new Client()
-                b = new Buffer(JSON.stringify(that._scrumLog))
-                c.on 'ready', ->
-                    c.put b, 'scrum.txt', (err) ->
-                        if err
-                            throw err
-                        c.end
-                c.connect ftpOptions
             that._recentMessage = false
 
         that.checkCronJob = new CronJob('*/30 * * * * *', activityCheck, null, true, null)
