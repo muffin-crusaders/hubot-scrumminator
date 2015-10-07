@@ -153,7 +153,7 @@ class Scrum
         this.cronJob.stop()
 
     toPrintable: ->
-        this._id.toString() + ": " + this._room.toString() + " at " + this._time.toString()
+        this._id.toString() + ": " + this._room.toString() + " at `" + this._time.toString() + "`"
 
     getId: ->
         this._id
