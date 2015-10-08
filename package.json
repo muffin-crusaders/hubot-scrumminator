@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "cron": "^1.0.9",
+    "node-gitter": "^1.2.8"
   },
   "peerDependencies": {
     "hubot": "2.x"
