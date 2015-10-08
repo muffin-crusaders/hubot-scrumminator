@@ -21,7 +21,7 @@ class Scrum
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
 
         # Request to get list of rooms the bot is in
-        # We match the name given to the constructor with a room from this list to get the id
+        # We match the that._room, with a room from this list, in order to get the id
         # The id is needed for the other API calls
         # ------------ start of request ----------------
         options =
@@ -125,6 +125,7 @@ class Scrum
                 )
             res.on('end', ->
                 for user in JSON.parse(output)
+                    # Build a section in the scrum log for everyone but the bot
                     if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
                         that._scrumLog[user.username] = {
                             'username': user.username,
