@@ -12,7 +12,6 @@ class Scrum
         that = this
         that._robot = robot
         that._room = room
-        that._roomId = null
         that._time = time
         that._id = id
         # stores answers + other info for scrum
@@ -21,18 +20,6 @@ class Scrum
         that._recentMessage = true
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
-
-        # Request to get list of rooms the bot is in
-        # Find the id by matching room names
-        # The id is needed for the other API calls
-        gitter.currentUser()
-            .then (user) ->
-                user.rooms()
-                    .then (rooms) ->
-                        for room in rooms
-                            # match uri to room name
-                            if room.uri == that._room
-                                that._roomId = room.id
 
 
     startScrum = ->
@@ -58,7 +45,7 @@ class Scrum
             hour.toString() + ':' + minutes.toString()
 
         # Find current room
-        gitter.rooms.find(that._roomId)
+        gitter.rooms.join(that._room)
             .then (room) ->
                 # Request to get list of users in the scrum's room
                 room.subscribe()
@@ -112,7 +99,7 @@ class Scrum
                 console.log 'Ending scrum'
                 that.checkCronJob.stop()
                 # Unsubscribe from the rooms message stream
-                gitter.rooms.find(that._roomId)
+                gitter.rooms.join(that._room)
                     .then (room) ->
                         room.unsubscribe()
                 that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
