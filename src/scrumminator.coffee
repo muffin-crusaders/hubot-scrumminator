@@ -30,6 +30,7 @@ module.exports = (robot) ->
     # Is this useful?
     robot.respond /schedule scrum every (\S+) at (\S+) in (\S+)/i, (res) ->
         interval = res.match[1]
+        # handle times given as __:__ or __
         time = res.match[2].split(":")
         if !time[1]
             time[1] = "00"

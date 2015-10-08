@@ -21,7 +21,7 @@ class Scrum
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
 
         # Request to get list of rooms the bot is in
-        # We match the that._room, with a room from this list, in order to get the id
+        # Find the id by matching room names
         # The id is needed for the other API calls
         # ------------ start of request ----------------
         options =
@@ -94,6 +94,7 @@ class Scrum
                         catch
                             console.log '... waiting on rest of response ...'
                             return
+                        # handle the message
                         parseLog output
                         output = ''
                 )
@@ -144,7 +145,7 @@ class Scrum
             # ignore heartbeat message
             if (response == ' \n')
                 return
-            # split up lines in message, since most users will paste all their answers together
+            # split up lines in message since most users will paste all of their answers together
             data = JSON.parse(response.toString())
             messages = data.text.split('\n')
             # get user info
@@ -154,7 +155,7 @@ class Scrum
             answerPattern = /^([0-9])[\.\-](.+)$/i
 
             for message in messages
-                # match answer, overly cautious checking to make sure the bot isn't trying to infiltrate
+                # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
                 if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
