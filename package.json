@@ -13,7 +13,7 @@
     "url": "https://github.com/hubot-scripts/hubot-scrumminator/issues"
   },
   "dependencies": {
-    "cron": "^1.0.9"
+    "cron": "^1.0.9",
   },
   "peerDependencies": {
     "hubot": "2.x"

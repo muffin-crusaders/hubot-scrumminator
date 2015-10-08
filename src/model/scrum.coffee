@@ -1,5 +1,6 @@
 CronJob = require('cron').CronJob
 https = require('https')
+Client = require('ftp')
 
 class Scrum
     token = process.env.HUBOT_GITTER2_TOKEN
@@ -12,12 +13,17 @@ class Scrum
         that._roomId = null
         that._time = time
         that._id = id
-        that._chatlog = []
-        that._answers = []
-        that._recentMessage = false
+        # stores answers + other info for scrum
+        that._scrumLog = {}
+        # flag for activity during scrum
+        that._recentMessage = true
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
 
+        # Request to get list of rooms the bot is in
+        # Find the id by matching room names
+        # The id is needed for the other API calls
+        # ------------ start of request ----------------
         options =
             hostname: 'api.gitter.im',
             port:     443,
@@ -32,9 +38,8 @@ class Scrum
                 )
             res.on('end', ->
                 for entry in JSON.parse(output)
-                    console.log entry
+                    # match url to room name
                     if entry.url == '/' + that._room
-                        console.log '------- MATCHED ------------\n' + entry.id.toString()
                         that._roomId = entry.id
                 )
             )
@@ -43,9 +48,9 @@ class Scrum
             that._robot.send e )
 
         req.end()
+        # -------------- end of request ----------------
 
     startScrum = ->
-        console.log '----------------------------------- startScrum ----------------------------------------------'
         that = this
         that._robot.send
             room: that._room
@@ -56,6 +61,19 @@ class Scrum
             4. Any tasks to add to the Sprint Backlog? (If applicable)
             5. Have you learned or decided anything new? (If applicable)"""
 
+        # Add some extra info to the scrum log so its more identifiable
+        that._scrumLog['Room'] = that._room
+        now = new Date()
+        day = now.getDate()
+        month = now.getMonth() + 1
+        year = now.getFullYear()
+        hour = now.getHours()
+        minutes = now.getMinutes()
+        that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
+            hour.toString() + ':' + minutes.toString()
+
+        # Request to stream chat messages from the scrum's room
+        # ------------ start of request ----------------
         options =
             hostname: 'stream.gitter.im',
             port:     443,
@@ -71,11 +89,14 @@ class Scrum
                     if chunk.toString() != ' \n'
                         output += chunk.toString()
                         try
+                            # reasoning is that if JSON parse fails we don't have the whole object
                             JSON.parse output
                         catch
                             console.log '... waiting on rest of response ...'
                             return
+                        # handle the message
                         parseLog output
+                        output = ''
                 )
             )
 
@@ -87,121 +108,89 @@ class Scrum
             that._robot.send e )
 
         req.end()
+        # -------------- end of request ----------------
+
+        # Request to get list of users in the scrum's room
+        # ------------ start of request ----------------
+        options2 =
+            hostname: 'api.gitter.im',
+            port:     443,
+            path:     '/v1/rooms/' + that._roomId + '/users',
+            method:   'GET',
+            headers:  {'Authorization': 'Bearer ' + token}
+
+        req2 = https.request(options2, (res) ->
+            output = ''
+            res.on('data', (chunk) ->
+                output += chunk.toString()
+                )
+            res.on('end', ->
+                for user in JSON.parse(output)
+                    # Build a section in the scrum log for everyone but the bot
+                    if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
+                        that._scrumLog[user.username] = {
+                            'username': user.username,
+                            'displayName': user.displayName,
+                            'answers': ['', '', '', '', '']
+                        }
+                )
+            )
+        req2.on('error', (e) ->
+            that._robot.send e )
+
+        req2.end()
+        # -------------- end of request ----------------
 
         parseLog = (response) ->
-            console.log('----------------------------------------- parseLog -----------------------------------------------------')
-            console.log 'response ' + response
+            # ignore heartbeat message
             if (response == ' \n')
                 return
+            # split up lines in message since most users will paste all of their answers together
             data = JSON.parse(response.toString())
             messages = data.text.split('\n')
+            # get user info
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
-            answerPattern = /^[0-9]\.(.+)$/i
+            answerPattern = /^([0-9])[\.\-](.+)$/i
 
             for message in messages
-                if userid != 'ramp-pcar-bot'
+                # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
+                if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
                     that._recentMessage = true
-                    that._chatlog.push message
-                    console.log that._chatlog
-                    that._robot.send
-                        room: that._room
-                        'Received ' + displayname + ': ' + message
-                    if message.match answerPattern
-                        if !that._answers[userid]
-                            that._answers[userid] = []
-                        that._answers[userid].push message
+                    num = answerPattern.exec(message)[1]
+                    that._scrumLog[userid].answers[num-1] = message
+                    # Check to see if all answers have been given by the user, thank them if they have
+                    if that._scrumLog[userid].answers.indexOf('') < 0
                         that._robot.send
-                            room: that._room
-                            'Answer pattern matched'
+                            room: that._room,
+                            'Thanks ' + displayname.split(' ')[0]
 
-            activityCheck = () ->
-                console.log('---------------------------------- activityCheck -------------------------------------------------')
-                if !that._recentMessage
-                    that.checkCronJob.stop()
-                    if reqSocket then reqSocket.end()
-                    now = new Date()
-                    day = now.getDate()
-                    month = now.getMonth() + 1
-                    year = now.getFullYear()
-                    console.log '-END OF SCRUM FOR ' + month + '/' + day + '/' + year + '-'
-                    that._robot.send
-                        room: that._room
-                        '-END OF SCRUM FOR ' + month + '/' + day + '/' + year + '-'
-                that._recentMessage = false
+        activityCheck = () ->
+            if !that._recentMessage
+                that.checkCronJob.stop()
+                # end the message stream
+                if reqSocket then reqSocket.end()
+                # save scrum to the brain, everything before the comma is the key
+                that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
+                that._robot.brain.save
+                that._recentMessage = true
+            that._recentMessage = false
 
-            that.checkCronJob = `new CronJob('0 * * * * *', activityCheck, null, true, null);`
+        # Run activityCheck every 15 minutes
+        that.checkCronJob = new CronJob('0 */15 * * * *', activityCheck, null, true, null)
 
     cancelCronJob: ->
         this.cronJob.stop()
 
     toPrintable: ->
-        this._id.toString() + ": " + this._room.toString() + " at " + this._time.toString()
+        this._id.toString() + ": " + this._room.toString() + " at `" + this._time.toString() + "`"
 
     getId: ->
         this._id
 
-#   team: ->
-#     new Team(@robot)
-#
-#   players: ->
-#     @.team().players()
-#
-#   ##
-#   # Get specific player by name
-#   player: (name) ->
-#     Player.find(@robot, name)
-#
-#   prompt: (player, message) ->
-#     Player.dm(@robot, player.name, message)
-#
-#   demo: ->
-#
-#
-#   # FIXME: This should take a player object
-#   # and return the total points they have
-#   # there are a few ways to do this:
-#   #   - we just find the last scrum they participated
-#   #     in copy it and add 10 points, this makes it hard
-#   #     to account for bonus points earned for consecutive
-#   #     days of particpating in the scrum
-#   #   - we scan back and total up all their points ever, grouping
-#   #     the consecutive ones and applying the appropriate bonus points
-#   #     for those instances
-#
-#
-#
-#   # takes a player and a callback
-#   # the callback is going to receive the score for the player
-#   getScore: (player, fn) ->
-#     client().zscore("scrum", player.name, (err, scoreFromRedis) ->
-#       if scoreFromRedis
-#         player.score = scoreFromRedis
-#         fn(player)
-#       else
-#         console.log(
-#           "getScoreError: didn't get a response got \' #{scoreFromRedis} \'\n" + "player was: #{player.name}"
-#         )
-#     )
-#
-#   # TODO: JP
-#   # Fix me! maybe use promises here?
-#   getScores: (players, fn) ->
-#     for player in players
-#       client().zscore("scrum", player.name, (err, scoreFromRedis) ->
-#         if scoreFromRedis
-#           player.score = scoreFromRedis
-#         else
-#           console.log(
-#             "getScoreError: didn't get a response got \' #{scoreFromRedis} \'\n" + "player was: #{player.name}"
-#           )
-#       ).then(fn(players))
-#
-#   ##
-#   # Just return a key for the current day ie 2015-4-5
-#   date: ->
-#     new Date().toJSON().slice(0,10)
+    getLog: ->
+        this._scrumLog
 
 
 module.exports = Scrum
