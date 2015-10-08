@@ -64,6 +64,7 @@ module.exports = (robot) ->
                 scrum.cancelCronJob()
                 # removes the chosen scrum from the list
                 scrum_list.splice(scrum_list.indexOf(scrum), 1)
+                # remove from brain
                 robot.brain.remove 'scrum' + id
                 robot.brain.save
                 res.send "Scrum " + id + " has been canceled"
@@ -87,11 +88,14 @@ module.exports = (robot) ->
 
         for s in Object.keys(stored_scrums)
             scrum = stored_scrums[s]
+            # we remove s so that we do not have duplicates
+            # we let createScrum handle calling brain.save
             robot.brain.remove s
             createScrum robot, scrum.time, scrum.room
 
 createScrum = (robot, time, room) ->
     scrum = new Scrum robot, time, room, id_count
+    # save scrum to brain so that we can load it on reboot
     robot.brain.set 'scrum' + id_count.toString(), {'time': time, 'room': room}
     id_count += 1
     scrum_list.push scrum

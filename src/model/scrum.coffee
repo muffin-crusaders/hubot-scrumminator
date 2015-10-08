@@ -13,11 +13,17 @@ class Scrum
         that._roomId = null
         that._time = time
         that._id = id
+        # stores answers + other info for scrum
         that._scrumLog = {}
+        # flag for activity during scrum
         that._recentMessage = true
 
         that.cronJob = new CronJob(time, startScrum, null, true, null, this)
 
+        # Request to get list of rooms the bot is in
+        # We match the name given to the constructor with a room from this list to get the id
+        # The id is needed for the other API calls
+        # ------------ start of request ----------------
         options =
             hostname: 'api.gitter.im',
             port:     443,
@@ -32,6 +38,7 @@ class Scrum
                 )
             res.on('end', ->
                 for entry in JSON.parse(output)
+                    # match url to room name
                     if entry.url == '/' + that._room
                         that._roomId = entry.id
                 )
@@ -41,6 +48,7 @@ class Scrum
             that._robot.send e )
 
         req.end()
+        # -------------- end of request ----------------
 
     startScrum = ->
         that = this
@@ -53,6 +61,7 @@ class Scrum
             4. Any tasks to add to the Sprint Backlog? (If applicable)
             5. Have you learned or decided anything new? (If applicable)"""
 
+        # Add some extra info to the scrum log so its more identifiable
         that._scrumLog['Room'] = that._room
         now = new Date()
         day = now.getDate()
@@ -63,6 +72,8 @@ class Scrum
         that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
             hour.toString() + ':' + minutes.toString()
 
+        # Request to stream chat messages from the scrum's room
+        # ------------ start of request ----------------
         options =
             hostname: 'stream.gitter.im',
             port:     443,
@@ -78,6 +89,7 @@ class Scrum
                     if chunk.toString() != ' \n'
                         output += chunk.toString()
                         try
+                            # reasoning is that if JSON parse fails we don't have the whole object
                             JSON.parse output
                         catch
                             console.log '... waiting on rest of response ...'
@@ -95,7 +107,10 @@ class Scrum
             that._robot.send e )
 
         req.end()
+        # -------------- end of request ----------------
 
+        # Request to get list of users in the scrum's room
+        # ------------ start of request ----------------
         options2 =
             hostname: 'api.gitter.im',
             port:     443,
@@ -110,7 +125,7 @@ class Scrum
                 )
             res.on('end', ->
                 for user in JSON.parse(output)
-                    if user.username != process.env.HUBOT_NAME
+                    if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
                         that._scrumLog[user.username] = {
                             'username': user.username,
                             'displayName': user.displayName,
@@ -122,22 +137,28 @@ class Scrum
             that._robot.send e )
 
         req2.end()
+        # -------------- end of request ----------------
 
         parseLog = (response) ->
+            # ignore heartbeat message
             if (response == ' \n')
                 return
+            # split up lines in message, since most users will paste all their answers together
             data = JSON.parse(response.toString())
             messages = data.text.split('\n')
+            # get user info
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
             answerPattern = /^([0-9])[\.\-](.+)$/i
 
             for message in messages
+                # match answer, overly cautious checking to make sure the bot isn't trying to infiltrate
                 if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
+                    # Check to see if all answers have been given by the user, thank them if they have
                     if that._scrumLog[userid].answers.indexOf('') < 0
                         that._robot.send
                             room: that._room,
@@ -146,13 +167,15 @@ class Scrum
         activityCheck = () ->
             if !that._recentMessage
                 that.checkCronJob.stop()
+                # end the message stream
                 if reqSocket then reqSocket.end()
-                console.log that._scrumLog
+                # save scrum to the brain, everything before the comma is the key
                 that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
                 that._robot.brain.save
                 that._recentMessage = true
             that._recentMessage = false
 
+        # Run activityCheck every 15 minutes
         that.checkCronJob = new CronJob('0 */15 * * * *', activityCheck, null, true, null)
 
     cancelCronJob: ->
