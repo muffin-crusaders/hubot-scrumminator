@@ -23,6 +23,7 @@ class Scrum
 
     startScrum = ->
         that = this
+        console.log '[hubot-scrumminator] Starting scrum in ' + that._room
         that._robot.send
             room: that._room
             """Scrum time! Please provide answers to the following:
@@ -68,8 +69,6 @@ class Scrum
 
 
         parseLog = (response) ->
-            console.log '----------------------- parseLog --------------------------------'
-            console.log response
             data = response.model
             # split up lines in message since most users will paste all of their answers together
             messages = data.text.split('\n')
@@ -82,6 +81,7 @@ class Scrum
             for message in messages
                 # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
                 if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
+                    console.log '[hubot-scrumminator] Recieved answer from ' + userid
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
@@ -93,9 +93,9 @@ class Scrum
 
 
         activityCheck = () ->
-            console.log '--------------------- activityCheck ---------------------------'
+            console.log '[hubot-scrumminator] Checking activity.....'
             if !that._recentMessage
-                console.log 'Ending scrum'
+                console.log '[hubot-scrumminator] Ending scrum in ' + that._room
                 that.checkCronJob.stop()
                 # Unsubscribe from the rooms message stream
                 gitter.rooms.join(that._room)
@@ -105,7 +105,7 @@ class Scrum
                 that._robot.brain.save
                 that._recentMessage = true
             that._recentMessage = false
-            console.log 'Continuing scrum'
+            console.log '[hubot-scrumminator] Continuing scrum in ' + that._room
 
         # Run activityCheck every 15 minutes
         that.checkCronJob = new CronJob('0 */15 * * * *', activityCheck, null, true, null)
