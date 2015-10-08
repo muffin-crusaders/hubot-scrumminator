@@ -3,8 +3,7 @@ https = require('https')
 Gitter = require('node-gitter')
 
 class Scrum
-    token = process.env.HUBOT_GITTER2_TOKEN
-    gitter = new Gitter(token)
+    gitter = new Gitter(process.env.HUBOT_GITTER2_TOKEN)
     id_count = 1
 
 

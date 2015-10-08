@@ -56,6 +56,7 @@ module.exports = (robot) ->
     robot.respond /list scrums/i, (res) ->
         message = ''
         message += scrum.toPrintable() + '\n' for scrum in scrum_list
+        if message == '' then message = 'No scrums scheduled'
         res.send message
 
     robot.respond /cancel scrum (.+)/i, (res) ->
