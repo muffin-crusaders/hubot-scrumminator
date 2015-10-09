@@ -34,15 +34,15 @@ class Scrum
             5. Have you learned or decided anything new? (If applicable)"""
 
         # Add some extra info to the scrum log so its more identifiable
-        that._scrumLog['Room'] = that._room
         now = new Date()
         day = now.getDate()
         month = now.getMonth() + 1
         year = now.getFullYear()
         hour = now.getHours()
         minutes = now.getMinutes()
-        that._scrumLog['Timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
+        that._scrumLog['timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
             hour.toString() + ':' + minutes.toString()
+        that._scrumLog['participants'] = []
 
         # Find current room
         gitter.rooms.join(that._room)
@@ -61,11 +61,10 @@ class Scrum
                         for user in users
                             # Create a section for everyone but the bot
                             if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
-                                that._scrumLog[user.username] = {
-                                    'username': user.username,
-                                    'displayName': user.displayName,
+                                that._scrumLog.participants.push({
+                                    'name': user.username,
                                     'answers': ['', '', '', '', '']
-                                }
+                                })
 
 
         parseLog = (response) ->
@@ -101,9 +100,10 @@ class Scrum
                 gitter.rooms.join(that._room)
                     .then (room) ->
                         room.unsubscribe()
-                that._robot.brain.set "scrumlog" + day.toString() + month.toString() + year.toString() + hour.toString() + minutes.toString(), that._scrumLog
+                that._robot.brain.data._private.scrumminator.logs[that._id].push( that._scrumLog )
                 that._robot.brain.save
                 that._recentMessage = true
+                return
             that._recentMessage = false
             console.log '[hubot-scrumminator] Continuing scrum in ' + that._room
 
@@ -111,12 +111,16 @@ class Scrum
         that.checkCronJob = new CronJob('0 */15 * * * *', activityCheck, null, true, null)
 
 
-    cancelCronJob: ->
+    stopCronJob: ->
         this.cronJob.stop()
 
 
+    startCronJob: ->
+        this.cronJob.start()
+
+
     toPrintable: ->
-        this._id.toString() + ": " + this._room.toString() + " at `" + this._time.toString() + "`"
+        this._room.toString() + " at `" + this._time.toString() + "`"
 
 
     getId: ->

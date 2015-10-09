@@ -17,7 +17,7 @@
 Scrum = require('./model/scrum')
 
 scrum_list = []
-id_count = 1
+
 
 module.exports = (robot) ->
     robot.respond /schedule scrum at `?(.+)`? in (\S+)/i, (res) ->
@@ -55,22 +55,44 @@ module.exports = (robot) ->
 
     robot.respond /list scrums/i, (res) ->
         message = ''
-        message += scrum.toPrintable() + '\n' for scrum in scrum_list
+        message += scrum_list.indexOf(scrum) + ': ' + scrum.toPrintable() + '\n' for scrum in scrum_list
         if message == '' then message = 'No scrums scheduled'
         res.send message
 
-    robot.respond /cancel scrum (.+)/i, (res) ->
-        id = parseInt(res.match[1], 10)
-        for scrum in scrum_list
-            if scrum.getId() == id
-                scrum.cancelCronJob()
-                # removes the chosen scrum from the list
-                scrum_list.splice(scrum_list.indexOf(scrum), 1)
+    robot.respond /delete scrum (.+)/i, (res) ->
+        index = parseInt(res.match[1], 10)
+        scrum = scrum_list[index]
+        storedScrums = robot.brain.data._private.scrumminator.scrums
+        scrum.stopCronJob()
+        # removes the chosen scrum from the list
+        scrum_list.splice(scrum_list.indexOf(scrum), 1)
+        for storedScrum in storedScrums
+            if scrum.getId() == storedScrum.id
                 # remove from brain
-                robot.brain.remove 'scrum' + id
+                storedScrums.splice(storedScrums.indexOf(storedScrum), 1)
                 robot.brain.save
-                res.send "Scrum " + id + " has been canceled"
+                res.send "Scrum " + index + " has been canceled"
                 return
+
+    robot.respond /stop scrum (.+)/i, (res) ->
+        id = parseInt(res.match[1], 10)
+        scrum = scrum_list[id]
+        scrum.stopCronJob()
+        storedScrums = robot.brain.data._private.scrumminator.scrums
+        for storedScrum in storedScrums
+            if scrum.getId() == storedScrum.id
+                storedScrum.active = false
+                robot.brain.save()
+
+    robot.respond /start scrum (.+)/i, (res) ->
+        id = parseInt(res.match[1], 10)
+        scrum = scrum_list[id]
+        scrum.startCronJob()
+        storedScrums = robot.brain.data._private.scrumminator.scrums
+        for storedScrum in storedScrums
+            if scrum.getId() == storedScrum.id
+                storedScrum.active = true
+                robot.brain.save()
 
     robot.respond /answers for (.+) from (.+)/i, (res) ->
         userid = res.match[1]
@@ -86,21 +108,36 @@ module.exports = (robot) ->
 
     #LOAD PAST SCRUMS
     robot.brain.on 'init', ->
-        stored_scrums = robot.brain.data._private
+        if !robot.brain.data._private.scrumminator
+            robot.brain.set 'scrumminator', {'scrums': [], 'logs': {}}
+        stored_scrums = robot.brain.data._private.scrumminator.scrums
 
-        for s in Object.keys(stored_scrums)
-            scrum = stored_scrums[s]
-            # we remove s so that we do not have duplicates
-            # we let createScrum handle calling brain.save
-            robot.brain.remove s
-            createScrum robot, scrum.time, scrum.room
+        for scrum in stored_scrums
+            newScrum = createScrum robot, scrum.cron, scrum.room, scrum.id, false
+            if !scrum.active
+                newScrum.stopCronJob()
 
-createScrum = (robot, time, room) ->
-    scrum = new Scrum robot, time, room, id_count
+
+createScrum = (robot, cron, room, id = guid(), isNew = true) ->
+    scrum = new Scrum robot, cron, room, id
     # save scrum to brain so that we can load it on reboot
-    robot.brain.set 'scrum' + id_count.toString(), {'time': time, 'room': room}
-    id_count += 1
+    if isNew
+        robot.brain.data._private.scrumminator.scrums.push({ 'cron': cron, 'room': room, 'active': true, 'id': id })
+        robot.brain.data._private.scrumminator.logs[id] = []
+        robot.brain.save
     scrum_list.push scrum
-    robot.brain.save
 
     return scrum
+
+
+# Generates an rfc4122 version 4 compliant guid.
+# Taken from here: http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
+guid = () ->
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) ->
+        r = Math.random() * 16 | 0
+        if c == 'x'
+            v = r
+        else
+            v = (r & 0x3 | 0x8)
+        return v.toString(16);
+    )
