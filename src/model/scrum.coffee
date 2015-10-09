@@ -80,7 +80,7 @@ class Scrum
             for message in messages
                 # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
                 if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
-                    console.log '[hubot-scrumminator] Recieved answer from ' + userid
+                    console.log '[hubot-scrumminator] Received answer from ' + userid
                     that._recentMessage = true
                     num = answerPattern.exec(message)[1]
                     that._scrumLog[userid].answers[num-1] = message
