@@ -13,6 +13,7 @@ class Scrum
         that._room = room
         that._time = time
         that._id = id
+        this._active = true
         # stores answers + other info for scrum
         that._scrumLog = {}
         # flag for activity during scrum
@@ -113,14 +114,16 @@ class Scrum
 
     stopCronJob: ->
         this.cronJob.stop()
+        this._active = false
 
 
     startCronJob: ->
         this.cronJob.start()
+        this._active = true
 
 
     toPrintable: ->
-        this._room.toString() + " at `" + this._time.toString() + "`"
+        this._room.toString() + " at `" + this._time.toString() + "` " + (if this._active then "(active)" else "(inactive)")
 
 
     getId: ->

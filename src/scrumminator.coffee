@@ -83,6 +83,7 @@ module.exports = (robot) ->
             if scrum.getId() == storedScrum.id
                 storedScrum.active = false
                 robot.brain.save()
+                res.send "Stopped scrum"
 
     robot.respond /start scrum (.+)/i, (res) ->
         id = parseInt(res.match[1], 10)
@@ -93,6 +94,7 @@ module.exports = (robot) ->
             if scrum.getId() == storedScrum.id
                 storedScrum.active = true
                 robot.brain.save()
+                res.send "Started scrum"
 
     #LOAD PAST SCRUMS
     robot.brain.on 'init', ->
