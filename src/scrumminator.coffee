@@ -94,18 +94,6 @@ module.exports = (robot) ->
                 storedScrum.active = true
                 robot.brain.save()
 
-    robot.respond /answers for (.+) from (.+)/i, (res) ->
-        userid = res.match[1]
-        scrumid = parseInt(res.match[2], 10)
-        log = []
-        for scrum in scrum_list
-            if scrum.getId() == scrumid
-                log = scrum.getLog()
-                message = ''
-                message += '>' + answer + '\n' for answer in log[userid].answers
-                res.send message
-                break
-
     #LOAD PAST SCRUMS
     robot.brain.on 'init', ->
         if !robot.brain.data._private.scrumminator
