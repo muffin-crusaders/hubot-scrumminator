@@ -20,35 +20,9 @@ scrum_list = []
 
 
 module.exports = (robot) ->
-    robot.respond /schedule scrum at `?(.+)`? in (\S+)/i, (res) ->
+    robot.respond /schedule scrum at `?(.+?)`? in (\S+)/i, (res) ->
         cron = res.match[1]
         room = res.match[2]
-        scrum = createScrum robot, cron, room
-
-        res.reply 'Scheduled scrum ' + scrum.toPrintable()
-
-    # Is this useful?
-    robot.respond /schedule scrum every (\S+) at (\S+) in (\S+)/i, (res) ->
-        interval = res.match[1]
-        # handle times given as __:__ or __
-        time = res.match[2].split(":")
-        if !time[1]
-            time[1] = "00"
-        room = res.match[3]
-
-        switch interval
-            when /weekday/i
-                cron = '00 ' + time[1] + ' ' + time[0] + ' * * 1-5'
-            when /day/i
-                cron = '00 ' + time[1] + ' ' + time[0] + ' * * *'
-            when /hour/i
-                cron = time[1] + time[0] + ' * * * *'
-            when /minute/i
-                cron = time[0] + ' * * * * *'
-            else
-                res.reply "Sorry, I couldn't understand the time"
-                return
-
         scrum = createScrum robot, cron, room
 
         res.reply 'Scheduled scrum ' + scrum.toPrintable()
