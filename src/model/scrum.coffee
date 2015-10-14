@@ -64,6 +64,7 @@ class Scrum
                             if user.username != process.env.HUBOT_NAME && user.displayName != process.env.HUBOT_NAME
                                 that._scrumLog.participants.push({
                                     'name': user.username,
+                                    'displayName': user.displayName,
                                     'answers': ['', '', '', '', '']
                                 })
 
