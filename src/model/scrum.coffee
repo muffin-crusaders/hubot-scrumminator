@@ -34,6 +34,8 @@ class Scrum
             4. Any tasks to add to the Sprint Backlog? (If applicable)
             5. Have you learned or decided anything new? (If applicable)"""
 
+        that._timeoutHandle = setTimeout(endScrum, 900000)
+
         # Add some extra info to the scrum log so its more identifiable
         now = new Date()
         day = now.getDate()
@@ -83,35 +85,31 @@ class Scrum
                 # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
                 if userid != process.env.HUBOT_NAME && displayname != process.env.HUBOT_NAME && message.match answerPattern
                     console.log '[hubot-scrumminator] Received answer from ' + userid
-                    that._recentMessage = true
+                    if that._timeoutHandle
+                        clearTimeout(that._timeoutHandle)
+                        that._timeoutHandle = undefined
+                    that._timeoutHandle = setTimeout(endScrum, 900000)
                     num = answerPattern.exec(message)[1]
-                    that._scrumLog[userid].answers[num-1] = message
-                    # Check to see if all answers have been given by the user, thank them if they have
-                    if that._scrumLog[userid].answers.indexOf('') < 0
-                        that._robot.send
-                            room: that._room,
-                            'Thanks ' + displayname.split(' ')[0]
+                    for user in that._scrumLog.participants
+                        if user.name == userid
+                            user.answers[num-1] = message
+                            # Check to see if all answers have been given by the user, thank them if they have
+                            if user.answers.indexOf('') < 0
+                                that._robot.send
+                                    room: that._room,
+                                    'Thanks ' + displayname.split(' ')[0]
 
 
-        activityCheck = () ->
-            console.log '[hubot-scrumminator] Checking activity.....'
-            if !that._recentMessage
-                console.log '[hubot-scrumminator] Ending scrum in ' + that._room
-                that.checkCronJob.stop()
-                # Unsubscribe from the rooms message stream
-                gitter.rooms.join(that._room)
-                    .then (room) ->
-                        room.unsubscribe()
-                that._robot.brain.data._private.scrumminator.logs[that._id].push( that._scrumLog )
-                that._robot.brain.save
-                that._recentMessage = true
-                return
-            that._recentMessage = false
-            console.log '[hubot-scrumminator] Continuing scrum in ' + that._room
-
-        # Run activityCheck every 15 minutes
-        that.checkCronJob = new CronJob('0 */15 * * * *', activityCheck, null, true, null)
-
+        endScrum = () ->
+            console.log '[hubot-scrumminator] Ending scrum in ' + that._room
+            clearTimeout(that._timeoutHandle)
+            that._timeoutHandle = undefined
+            # Unsubscribe from the rooms message stream
+            gitter.rooms.join(that._room)
+                .then (room) ->
+                    room.unsubscribe()
+            that._robot.brain.data._private.scrumminator.logs[that._id].push( that._scrumLog )
+            that._robot.brain.save
 
     stopCronJob: ->
         this.cronJob.stop()
@@ -129,10 +127,6 @@ class Scrum
 
     getId: ->
         this._id
-
-
-    getLog: ->
-        this._scrumLog
 
 
 module.exports = Scrum
