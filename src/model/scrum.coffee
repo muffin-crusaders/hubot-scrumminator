@@ -87,6 +87,7 @@ class Scrum
                     console.log '[hubot-scrumminator] Received answer from ' + userid
                     if that._timeoutHandle
                         clearTimeout(that._timeoutHandle)
+                        that._timeoutHandle = undefined
                     that._timeoutHandle = setTimeout(endScrum, 900000)
                     num = answerPattern.exec(message)[1]
                     for user in that._scrumLog.participants
@@ -102,6 +103,7 @@ class Scrum
         endScrum = () ->
             console.log '[hubot-scrumminator] Ending scrum in ' + that._room
             clearTimeout(that._timeoutHandle)
+            that._timeoutHandle = undefined
             # Unsubscribe from the rooms message stream
             gitter.rooms.join(that._room)
                 .then (room) ->
