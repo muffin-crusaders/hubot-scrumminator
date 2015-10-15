@@ -1,6 +1,7 @@
 CronJob = require('cron').CronJob
 https = require('https')
 Gitter = require('node-gitter')
+RomanNumerals = require('roman-numerals')
 
 class Scrum
     gitter = new Gitter(process.env.HUBOT_GITTER2_TOKEN)
@@ -34,6 +35,7 @@ class Scrum
             4. Any tasks to add to the Sprint Backlog? (If applicable)
             5. Have you learned or decided anything new? (If applicable)"""
 
+        thanked = []
         that._timeoutHandle = setTimeout(endScrum, 900000)
 
         # Add some extra info to the scrum log so its more identifiable
@@ -79,7 +81,7 @@ class Scrum
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
-            answerPattern = /^([0-9])[\.\-](.+)$/i
+            answerPattern = /^([0-9]|I{1,3}|IV|V)[\.\-\)\:>=]+(.+)$/i
 
             for message in messages
                 # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
@@ -90,14 +92,18 @@ class Scrum
                         that._timeoutHandle = undefined
                     that._timeoutHandle = setTimeout(endScrum, 900000)
                     num = answerPattern.exec(message)[1]
+                    if isNaN(num)
+                        num = RomanNumerals.toArabic(num)
                     for user in that._scrumLog.participants
                         if user.name == userid
                             user.answers[num-1] = message
-                            # Check to see if all answers have been given by the user, thank them if they have
-                            if user.answers.indexOf('') < 0
-                                that._robot.send
-                                    room: that._room,
-                                    'Thanks ' + displayname.split(' ')[0]
+                            # Check to see if atleast answers 1-3 have been given by the user, thank them if they have
+                            if user.answers.indexOf('') < 0 || user.answers.indexOf('') >= 3
+                                if thanked.indexOf(userid) < 0
+                                    thanked.push(userid)
+                                    that._robot.send
+                                        room: that._room,
+                                        'Thanks ' + displayname.split(' ')[0]
 
 
         endScrum = () ->
