@@ -2,6 +2,7 @@ CronJob = require('cron').CronJob
 https = require('https')
 Gitter = require('node-gitter')
 RomanNumerals = require('roman-numerals')
+phrases = require('../phrases.json')
 
 class Scrum
     gitter = new Gitter(process.env.HUBOT_GITTER2_TOKEN)
@@ -101,9 +102,10 @@ class Scrum
                             if user.answers.indexOf('') < 0 || user.answers.indexOf('') >= 3
                                 if thanked.indexOf(userid) < 0
                                     thanked.push(userid)
+                                    reply = phrases.thanks[Math.floor(Math.random()*phrases.thanks.length)];
                                     that._robot.send
                                         room: that._room,
-                                        'Thanks ' + displayname.split(' ')[0]
+                                        reply.replace('[username]', displayname.split(' ')[0])
 
 
         endScrum = () ->
