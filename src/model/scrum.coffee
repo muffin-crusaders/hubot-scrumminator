@@ -49,6 +49,7 @@ class Scrum
         that._scrumLog['timestamp'] = day.toString() + '/' + month.toString() + '/' + year.toString() + ' at ' +
             hour.toString() + ':' + minutes.toString()
         that._scrumLog['participants'] = []
+        that._robot.brain.data._private.scrumminator.logs[that._id].push( that._scrumLog )
 
         # Find current room
         gitter.rooms.join(that._room)
@@ -72,6 +73,7 @@ class Scrum
                                     'displayName': user.displayName,
                                     'answers': ['', '', '', '', '']
                                 })
+                        that._robot.brain.save
 
 
         parseLog = (response) ->
@@ -106,6 +108,7 @@ class Scrum
                                     that._robot.send
                                         room: that._room,
                                         reply.replace('[username]', displayname.split(' ')[0])
+                                that._robot.brain.save
 
 
         endScrum = () ->
@@ -116,7 +119,6 @@ class Scrum
             gitter.rooms.join(that._room)
                 .then (room) ->
                     room.unsubscribe()
-            that._robot.brain.data._private.scrumminator.logs[that._id].push( that._scrumLog )
             that._robot.brain.save
 
     stopCronJob: ->
