@@ -1,7 +1,7 @@
 {
   "name": "hubot-scrumminator",
   "description": "A hubot script that does the things",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "author": "Aleksuei Riabtsev <aleksuei.riabtsev@ec.gc.ca>",
   "license": "MIT",
   "keywords": "hubot, hubot-scripts",
