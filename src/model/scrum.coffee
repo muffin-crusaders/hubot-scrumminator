@@ -97,18 +97,19 @@ class Scrum
                     num = answerPattern.exec(message)[1]
                     if isNaN(num)
                         num = RomanNumerals.toArabic(num)
-                    for user in that._scrumLog.participants
-                        if user.name == userid
-                            user.answers[num-1] = message
-                            # Check to see if atleast answers 1-3 have been given by the user, thank them if they have
-                            if user.answers.indexOf('') < 0 || user.answers.indexOf('') >= 3
-                                if thanked.indexOf(userid) < 0
-                                    thanked.push(userid)
-                                    reply = phrases.thanks[Math.floor(Math.random()*phrases.thanks.length)];
-                                    that._robot.send
-                                        room: that._room,
-                                        reply.replace('[username]', displayname.split(' ')[0])
-                                that._robot.brain.save
+                    if 0 < num <=5
+                        for user in that._scrumLog.participants
+                            if user.name == userid
+                                user.answers[num-1] = message
+                                # Check to see if atleast answers 1-3 have been given by the user, thank them if they have
+                                if user.answers.indexOf('') < 0 || user.answers.indexOf('') >= 3
+                                    if thanked.indexOf(userid) < 0
+                                        thanked.push(userid)
+                                        reply = phrases.thanks[Math.floor(Math.random()*phrases.thanks.length)];
+                                        that._robot.send
+                                            room: that._room,
+                                            reply.replace('[username]', displayname.split(' ')[0])
+                                    that._robot.brain.save
 
 
         endScrum = () ->
