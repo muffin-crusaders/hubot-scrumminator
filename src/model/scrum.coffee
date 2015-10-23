@@ -84,7 +84,7 @@ class Scrum
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
-            answerPattern = /^([0-9]|I{1,3}|IV|V)[\.\-\)\:>=]+(.+)$/i
+            answerPattern = /^.*?([1-5]|I{1,3}|IV|V).*?(?!_)(\w.+)/i
 
             for message in messages
                 # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
