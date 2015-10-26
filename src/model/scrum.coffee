@@ -84,7 +84,7 @@ class Scrum
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
 
-            answerPattern = /^.*?([1-5]|I{1,3}|IV|V).*?(?!_)(\w.+)$/i
+            answerPattern = /^[^A-Za-z1-9]*?([1-5]|I{1,3}|IV|V).*?(?!_)(\w.+)$/i
 
             for message in messages
                 # match answer, plus overly cautious checking to make sure the bot isn't trying to infiltrate
@@ -99,7 +99,8 @@ class Scrum
                         num = RomanNumerals.toArabic(num)
                     if 0 < num <=5
                         for user in that._scrumLog.participants
-                            if user.name == userid
+                            # check to see if we've found the right user and that we havent received this answer before
+                            if user.name == userid && user.answers[num-1] == ""
                                 user.answers[num-1] = message
                                 # Check to see if atleast answers 1-3 have been given by the user, thank them if they have
                                 if user.answers.indexOf('') < 0 || user.answers.indexOf('') >= 3
