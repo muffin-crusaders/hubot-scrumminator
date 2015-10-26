@@ -99,7 +99,7 @@ class Scrum
                         num = RomanNumerals.toArabic(num)
                     if 0 < num <=5
                         for user in that._scrumLog.participants
-                            if user.name == userid
+                            if user.name == userid && user.answers[num-1] == ""
                                 user.answers[num-1] = message
                                 # Check to see if atleast answers 1-3 have been given by the user, thank them if they have
                                 if user.answers.indexOf('') < 0 || user.answers.indexOf('') >= 3
