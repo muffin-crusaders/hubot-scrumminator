@@ -56,10 +56,13 @@ class Scrum
             .then (room) ->
                 # Request to get list of users in the scrum's room
                 room.subscribe()
+                console.log '[hubot-scrumminator] room.subscribe'
                 # Each message is given an operation to signal if its a new message, edit, "viewed by" etc.
                 # 'create' is used for new messages
                 room.on 'chatMessages', (message) ->
+                    console.log '[hubot-scrumminator] chateMessage recieved'
                     if message.operation == 'create'
+                        console.log '[hubot-scrumminator] trying to parse'
                         parseLog message
 
                 # Request to get list of users in the scrum's room
@@ -83,7 +86,9 @@ class Scrum
             # get user info
             userid = data.fromUser.username
             displayname = data.fromUser.displayName
-
+  
+            console.log '[hubot-scrumminator] message: ' + messages
+            
             answerPattern = /^[^A-Za-z1-9]*?([1-5]|I{1,3}|IV|V).*?(?!_)(\w.+)$/i
 
             for message in messages
