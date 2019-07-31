@@ -14,7 +14,7 @@
 #   Aleksuei Riabtsev <aleksuei.riabtsev@ec.gc.ca>
 
 # Models
-Scrum = require('./model/scrum')
+Scrum = require('./model/scrum.js')
 
 scrum_list = []
 
